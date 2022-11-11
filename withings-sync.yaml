@@ -1,0 +1,140 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: withings-sync
+
+---
+# Leave unused variables defined, but empty ""
+apiVersion: v1
+kind: Secret
+metadata:
+  name: credentials
+  namespace: withings-sync
+type: Opaque
+stringData:
+  GARMIN_USERNAME: ""
+  GARMIN_PASSWORD: ""
+  TRAINERROAD_PASSWORD: ""
+  TRAINERROAD_USERNAME: ""
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: withings-oauth-cache
+  namespace: withings-sync
+spec:
+  storageClassName: csi-rbd-sc
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Mi
+  volumeMode: Filesystem
+
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: withings-garmin-sync
+  namespace: withings-sync
+spec:
+  concurrencyPolicy: Allow
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - -v
+
+            # override $HOME to put our oauth file in a known place
+            env:
+            - name: HOME
+              value: /root
+
+            # read usernames/passwords from the secret we defined
+            envFrom:
+            - secretRef:
+                name: credentials
+            image: ghcr.io/jaroslawhartman/withings-sync:master
+            imagePullPolicy: IfNotPresent
+            name: withings-garmin-sync
+            volumeMounts:
+            - mountPath: /root/
+              name: oauth-cache
+
+          restartPolicy: Never
+
+          # Never run this container as root
+          securityContext:
+            fsGroup: 1234
+            runAsGroup: 1234
+            runAsUser: 1234
+            runAsNonRoot: True
+          
+          volumes:
+          - name: oauth-cache
+            persistentVolumeClaim:
+              claimName: withings-oauth-cache
+
+  schedule: '0 */3 * * *'
+  successfulJobsHistoryLimit: 3
+
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: withings-sync
+#   namespace: withings-sync
+# spec:
+#   replicas: 1
+#   revisionHistoryLimit: 3
+#   selector:
+#     matchLabels:
+#       app: withings-sync
+#   template:
+#     metadata:
+#       labels:
+#         app: withings-sync
+#     spec:
+#       containers:
+#       - name: withings-sync
+#         image: ghcr.io/jaroslawhartman/withings-sync:master
+#         imagePullPolicy: IfNotPresent
+
+#         # override $HOME to put our oauth file in a known place
+#         env:
+#         - name: HOME
+#           value: /data
+
+#         # read usernames/passwords from the secret we defined
+#         envFrom:
+#         - secretRef:
+#             name: credentials
+
+#         volumeMounts:
+#         - mountPath: /data
+#           name: oauth-cache
+
+#         # run every 15 minutes, synched to clock time
+#         command:
+#         - sh
+#         - -c
+#         - while true; do date; withings-sync; echo; sleep 10000; done
+
+#       # Never run this container as root
+#       securityContext:
+#         fsGroup: 1234
+#         runAsGroup: 1234
+#         runAsUser: 1234
+#         runAsNonRoot: True
+
+#       volumes:
+#       - name: oauth-cache
+#         persistentVolumeClaim:
+#           claimName: withings-oauth-cache
