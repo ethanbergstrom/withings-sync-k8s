@@ -55,17 +55,20 @@ spec:
             # override $HOME to put our oauth file in a known place
             env:
             - name: HOME
-              value: /root
+              value: /data
+            
+            # Set the working directory to a location we have write access to
+            workingDir: /data
 
             # read usernames/passwords from the secret we defined
             envFrom:
             - secretRef:
                 name: credentials
-            image: ghcr.io/jaroslawhartman/withings-sync:master
-            imagePullPolicy: IfNotPresent
+            image: ghcr.io/jaroslawhartman/withings-sync:latest
+            imagePullPolicy: Always
             name: withings-garmin-sync
             volumeMounts:
-            - mountPath: /root/
+            - mountPath: /data/
               name: oauth-cache
 
           restartPolicy: Never
@@ -104,8 +107,8 @@ spec:
 #     spec:
 #       containers:
 #       - name: withings-sync
-#         image: ghcr.io/jaroslawhartman/withings-sync:master
-#         imagePullPolicy: IfNotPresent
+#         image: ghcr.io/jaroslawhartman/withings-sync:latest
+#         imagePullPolicy: Always
 
 #         # override $HOME to put our oauth file in a known place
 #         env:
@@ -118,14 +121,17 @@ spec:
 #             name: credentials
 
 #         volumeMounts:
-#         - mountPath: /data
+#         - mountPath: /data/
 #           name: oauth-cache
 
-#         # run every 15 minutes, synched to clock time
+#         # Stay running so we can populate the Withings cache PV
 #         command:
 #         - sh
 #         - -c
-#         - while true; do date; withings-sync; echo; sleep 10000; done
+#         - while true; do date; echo; sleep 10000; done
+
+#       # Set the working directory to a location we have write access to
+#       workingDir: /data
 
 #       # Never run this container as root
 #       securityContext:
