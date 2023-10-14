@@ -56,9 +56,6 @@ spec:
             env:
             - name: HOME
               value: /data
-            
-            # Set the working directory to a location we have write access to
-            workingDir: /data
 
             # read usernames/passwords from the secret we defined
             envFrom:
