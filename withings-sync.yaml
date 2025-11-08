@@ -27,16 +27,16 @@ metadata:
   name: withings-oauth-cache
   namespace: withings-sync
 spec:
-  storageClassName: csi-rbd-sc
+  storageClassName: ""
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
       storage: 1Mi
   volumeMode: Filesystem
-
+  volumeName: withings-oauth-cache-static-pv
 ---
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: withings-garmin-sync
@@ -54,9 +54,9 @@ spec:
 
             # override $HOME to put our oauth file in a known place
             env:
-            - name: HOME
-              value: /data
-
+            - name: WITHINGS_USER
+              value: /data/.withings_user.json
+            
             # read usernames/passwords from the secret we defined
             envFrom:
             - secretRef:
@@ -70,13 +70,6 @@ spec:
 
           restartPolicy: Never
 
-          # Never run this container as root
-          securityContext:
-            fsGroup: 1234
-            runAsGroup: 1234
-            runAsUser: 1234
-            runAsNonRoot: True
-          
           volumes:
           - name: oauth-cache
             persistentVolumeClaim:
@@ -109,8 +102,8 @@ spec:
 
 #         # override $HOME to put our oauth file in a known place
 #         env:
-#         - name: HOME
-#           value: /data
+#         - name: WITHINGS_USER
+#           value: /data/.withings_user.json
 
 #         # read usernames/passwords from the secret we defined
 #         envFrom:
@@ -121,23 +114,14 @@ spec:
 #         - mountPath: /data/
 #           name: oauth-cache
 
-#         # Stay running so we can populate the Withings cache PV
+#         # run every 15 minutes, synched to clock time
 #         command:
 #         - sh
 #         - -c
 #         - while true; do date; echo; sleep 10000; done
 
-#       # Set the working directory to a location we have write access to
-#       workingDir: /data
-
-#       # Never run this container as root
-#       securityContext:
-#         fsGroup: 1234
-#         runAsGroup: 1234
-#         runAsUser: 1234
-#         runAsNonRoot: True
-
 #       volumes:
 #       - name: oauth-cache
 #         persistentVolumeClaim:
 #           claimName: withings-oauth-cache
+
